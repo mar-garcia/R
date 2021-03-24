@@ -542,12 +542,15 @@ fg_grouping <- function(data, features){
 }
 
 
+ppm_dev <- function(e, t){((e-t)/t)*1e6}
+
 # identification
 
 identification <- function(features, cmps, rt_d = 60, ppm_d = 10){
   
   require(Rdisop)
   require(CluMSID)
+  require(CompoundDb)
   
   neutral_losses <- data.frame(
     formula = c("H2O", "C5H12NO5P", "C8H15NO4", "C9H17O10P", "C16H32O2", 
@@ -557,6 +560,11 @@ identification <- function(features, cmps, rt_d = 60, ppm_d = 10){
   for(i in seq(nrow(neutral_losses))){
     neutral_losses$massdiff[i] <- getMolecule(neutral_losses$formula[i])$exactmass
   }
+  
+  annotations_add <- data.frame(
+    ann = "[M+C2H8N]+",
+    massdif = getMolecule("C2H8N")$exactmass
+  )
   
   load("../tissues/data/RData/MS2_library_POS.RData")
   ms2list_pos <- ms2list
@@ -598,7 +606,30 @@ identification <- function(features, cmps, rt_d = 60, ppm_d = 10){
         massneut <- massneut[(massneut > (tmp - 1)) & (massneut < (tmp + 1))]
       }
     }
-    dt_fg$mass[y] <- mean(massneut, na.rm = TRUE)
+    massneut <- mean(massneut, na.rm = TRUE)
+    dt_fg$mass[y] <- massneut
+    
+    for(i in seq(nrow(y.features))){
+      if(!is.na(y.features$annotation[i])){
+        if(y.features$polarity[i] == "POS"){
+          y.pol = 1
+        } else if(y.features$polarity[i] == "NEG"){
+          y.pol = -1
+        }
+        if(y.features$annotation[i] %in% adducts(
+          polarity = y.pol)[,"name"]){
+         tmp <- ppm_dev(y.features$mzmed[i], 
+                        unlist(mass2mz(massneut, y.features$annotation[i]))) 
+        } else if (y.features$annotation[i] %in% annotations_add$ann){
+          tmp <- ppm_dev(y.features$mzmed[i], 
+                         massneut + annotations_add$massdif[which(
+                           y.features$annotation[i] == annotations_add$ann)])
+        } else {print(paste(y, i))}
+        if(abs(tmp) > 100){
+          y.features$annotation[i] <- NA
+        }
+      }
+    } # close y.features "i"
     
     idx <- which(duplicated(y.features$annotation[!is.na(y.features$annotation)]))
     if(length(idx) > 0){
