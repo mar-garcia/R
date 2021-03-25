@@ -1,24 +1,27 @@
-# dt_preparation
-
-dt_preparation <- function(polarity = c("POS", "NEG"),
-                           class, mznoise){
+dt_preparation <- function(xobj, class, mznoise
+                           #polarity = c("POS", "NEG")
+){
   require(xcms)
   
-  load(paste0("data/RData/IS_data_XCMS_", polarity, ".RData"))
+  if(xobj[[1]]@polarity == 0){
+    x.pol <- "NEG"
+  } else if(xobj[[1]]@polarity == 1){
+    x.pol <- "POS"
+  }
   
-  data <- featureValues(xdata, method = "sum", value = "into")
+  data <- featureValues(xobj, method = "sum", value = "into")
   data[is.na(data)] <- 0
   
-  features <- data.frame(featureDefinitions(xdata))
-  features$polarity <- polarity
+  features <- data.frame(featureDefinitions(xobj))
+  features$polarity <- x.pol
   
-  class.levels <- levels(factor(pData(xdata)[, class]))
+  class.levels <- levels(factor(pData(xobj)[, class]))
   for(i in seq(length(class.levels))){
-    tmp1 <- rowMeans(data[, pData(xdata)[, class] == class.levels[i]])
+    tmp1 <- rowMeans(data[, pData(xobj)[, class] == class.levels[i]])
     features <- cbind(features, tmp1)
     colnames(features)[ncol(features)] <- paste0("mean_", class.levels[i])
     
-    tmp2 <- rowMeans(data[, pData(xdata)[, class] != class.levels[i]])
+    tmp2 <- rowMeans(data[, pData(xobj)[, class] != class.levels[i]])
     features <- cbind(features, tmp2)
     colnames(features)[ncol(features)] <- paste0("mean_", class.levels[i], "_NO")
     
@@ -43,24 +46,22 @@ dt_preparation <- function(polarity = c("POS", "NEG"),
   }
   
   features <- features[order(features$mean_max2, decreasing = T), ]
-  rownames(features) <- gsub("FT", substring(polarity, 1, 1), rownames(features))
-  rownames(data) <- gsub("FT", substring(polarity, 1, 1), rownames(data))
-  colnames(data) <- gsub(paste0("_", polarity, "_FS.mzData"), "", colnames(data))
+  rownames(features) <- gsub("FT", substring(x.pol, 1, 1), rownames(features))
+  rownames(data) <- gsub("FT", substring(x.pol, 1, 1), rownames(data))
+  colnames(data) <- gsub(paste0("_", x.pol, "_FS.mzData"), "", colnames(data))
   
   datax <- list(
-    xdata = xdata,
+    xdata = xobj,
     data = data,
     features = features,
-    polarity = polarity
+    polarity = x.pol
   )
   
   return(datax)
 }
 
 
-# ft_grouping
-
-ft_grouping <- function(datax){
+ft_grouping <- function(datax, MS2x){
   
   require(CluMSID)
   require(CompoundDb)
@@ -78,8 +79,6 @@ ft_grouping <- function(datax){
   xdata <- datax[["xdata"]]
   data <- datax[["data"]]
   features <- datax[["features"]]
-  
-  load(paste0("../tissues/data/RData/MS2_library_", datax[["polarity"]], ".RData"))
   
   features$FG <- NA
   features$MS2 <- NA
@@ -206,7 +205,7 @@ ft_grouping <- function(datax){
     xdata = xdata,
     data = data,
     features = features,
-    polarity = polarity
+    polarity = datax[["polarity"]]
   )
   
   return(datax)
@@ -214,18 +213,18 @@ ft_grouping <- function(datax){
 
 
 
-# isotopologues
-
 isotopologues <- function(features){
   
   features <- features[order(features$mean_max2, decreasing = T), ]
   features$isotopes <- NA
   
-  z.polarities <- c("POS", "NEG")
+  z.polarities <- unique(features$polarity)
   
   for(z in seq(length(z.polarities))){
-    if(z.polarities[z] == "POS"){smbl <- "+"
-    } else if(z.polarities[z] == "NEG"){smbl <- "-"}
+    if(z.polarities[z] == "POS"){
+      smbl <- "+"
+    } else if(z.polarities[z] == "NEG"){
+      smbl <- "-"}
     z.features <- features[features$polarity == z.polarities[z], ]
     z.FG <- levels(factor(z.features$FG))
     z.FG <- z.FG[!grepl("NA", z.FG)]
@@ -257,8 +256,6 @@ isotopologues <- function(features){
 
 
 
-# fg_grouping
-
 fg_grouping <- function(data, features){
   
   require(Rdisop)
@@ -272,7 +269,7 @@ fg_grouping <- function(data, features){
   massdif <- outer(masspos, massneg, "-")
   colnames(massdif) <- names(massneg)
   rownames(massdif) <- names(masspos) 
-
+  
   
   features$FGx <- NA
   features$annotation <- NA
@@ -542,11 +539,11 @@ fg_grouping <- function(data, features){
 }
 
 
+
+
 ppm_dev <- function(e, t){((e-t)/t)*1e6}
 
-# identification
-
-identification <- function(features, cmps, rt_d = 60, ppm_d = 10){
+identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
   
   require(Rdisop)
   require(CluMSID)
@@ -566,10 +563,10 @@ identification <- function(features, cmps, rt_d = 60, ppm_d = 10){
     massdif = getMolecule("C2H8N")$exactmass
   )
   
-  load("../tissues/data/RData/MS2_library_POS.RData")
-  ms2list_pos <- ms2list
-  load("../tissues/data/RData/MS2_library_NEG.RData")
-  ms2list_neg <- ms2list
+  #load("../tissues/data/RData/MS2_library_POS.RData")
+  #ms2list_pos <- ms2list
+  #load("../tissues/data/RData/MS2_library_NEG.RData")
+  #ms2list_neg <- ms2list
   
   dt_fg <- data.frame(
     FG = unique(features$FGx),
@@ -618,8 +615,8 @@ identification <- function(features, cmps, rt_d = 60, ppm_d = 10){
         }
         if(y.features$annotation[i] %in% adducts(
           polarity = y.pol)[,"name"]){
-         tmp <- ppm_dev(y.features$mzmed[i], 
-                        unlist(mass2mz(massneut, y.features$annotation[i]))) 
+          tmp <- ppm_dev(y.features$mzmed[i], 
+                         unlist(mass2mz(massneut, y.features$annotation[i]))) 
         } else if (y.features$annotation[i] %in% annotations_add$ann){
           tmp <- ppm_dev(y.features$mzmed[i], 
                          massneut + annotations_add$massdif[which(
@@ -667,10 +664,15 @@ identification <- function(features, cmps, rt_d = 60, ppm_d = 10){
           y.pol <- 1
         }
         if(y.features$mzmed[i] < (mean(massneut) - 2)){
-          if(y.features$polarity[i] == "POS"){smbl <- "+"
-          } else if(y.features$polarity[i] == "NEG"){smbl <- "-"}
-          ms2list <- get(paste0("ms2list_", tolower(y.features$polarity[i])))
-          y.ms2 <- findFragment(ms2list, y.features$mzmed[i])
+          if(y.features$polarity[i] == "POS"){
+            smbl <- "+"
+            y.pol <- "positive"
+          } else if(y.features$polarity[i] == "NEG"){
+            smbl <- "-"
+            y.pol <- "negative"
+            }
+          y.ms2 <- splitPolarities(ms2list, y.pol)
+          y.ms2 <- findFragment(y.ms2, y.features$mzmed[i])
           y.ms2 <- getSpectrum(y.ms2, "rt", y.features$rtmed[i], rt.tol = 15)
           if(length(y.ms2) > 0){
             if(length(y.ms2) > 1){
