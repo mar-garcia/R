@@ -809,8 +809,7 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
   dt_fg$unknown <- grepl("Unknown", dt_fg$compound) | (dt_fg$compound == "")
   dt_fg$duplicated <- dt_fg$compound %in% dt_fg$compound[duplicated(dt_fg$compound)]
   dt_fg$background <- dt_fg$FG %in% unique(
-    features$FGx[features$mean_max2 < min(apply(
-      features[,c("mean_solv", "mean_blank", "mean_STDmix")], 1, max))])
+    features$FGx[features$mean_max2 < features$mean_max])
   dt_fg$color <- 0
   dt_fg$color[!dt_fg$unknown] <- 1
   dt_fg$color[dt_fg$duplicated] <- 2
