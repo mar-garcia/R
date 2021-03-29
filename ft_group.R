@@ -61,7 +61,7 @@ dt_preparation <- function(xobj, class, mznoise
 }
 
 
-ft_grouping <- function(datax, MS2x){
+ft_grouping <- function(datax, MS2x, ft_idx = NULL){
   
   require(CluMSID)
   require(CompoundDb)
@@ -80,13 +80,17 @@ ft_grouping <- function(datax, MS2x){
   data <- datax[["data"]]
   features <- datax[["features"]]
   
+  if(length(ft_idx) == 0){
+    ft_idx <- seq(nrow(features))
+  }
+  
   features$FG <- NA
   features$MS2 <- NA
   
   y.n <- 0
   
-  for(y in seq(nrow(features))){
-    if(is.na(features$FG[y])){ # continue only if feature "y" still has not 
+  for(y in seq(length(ft_idx))){
+    if(is.na(features$FG[ft_idx[y]])){ # continue only if feature "y" still has not 
       # assigned to any "FG"
       y.n <- y.n + 1 
       y.features <- features[is.na(features$FG), ] # subset the feature  matrix taking only
@@ -201,6 +205,8 @@ ft_grouping <- function(datax, MS2x){
                         formatC(features$FG, width = nchar(nrow(features)), 
                                 flag = "0"))
   
+  features$FG[grep("NA", features$FG)] <- NA
+  
   datax <- list(
     xdata = xdata,
     data = data,
@@ -226,6 +232,7 @@ isotopologues <- function(features){
     } else if(z.polarities[z] == "NEG"){
       smbl <- "-"}
     z.features <- features[features$polarity == z.polarities[z], ]
+    z.features <- z.features[!is.na(z.features$FG), ]
     z.FG <- levels(factor(z.features$FG))
     z.FG <- z.FG[!grepl("NA", z.FG)]
     for(y in seq(length(z.FG))){
