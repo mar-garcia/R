@@ -142,7 +142,7 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL){
             smbl <- "-"
           }
           
-          y.ms2 <- findFragment(ms2list, y.features$mzmed[i])
+          y.ms2 <- findFragment(MS2x, y.features$mzmed[i])
           y.ms2 <- getSpectrum(y.ms2, "rt", y.features$rtmed[i], rt.tol = 10)
           for(j in seq(nrow(y.features))){
             if(length(y.ms2) == 1){
@@ -164,7 +164,7 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL){
         y.features$MS2x <- grepl("TRUE", y.features$MS2x)
         
         for(i in which(y.features$MS2x)){
-          y.ms2 <- findFragment(ms2list, y.features$mzmed[i])
+          y.ms2 <- findFragment(MS2x, y.features$mzmed[i])
           y.ms2 <- getSpectrum(y.ms2, "rt", y.features$rtmed[i], rt.tol = 10)
           if(length(y.ms2) == 1){
             y.prec <- y.ms2@precursor
@@ -570,11 +570,6 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
     massdif = getMolecule("C2H8N")$exactmass
   )
   
-  #load("../tissues/data/RData/MS2_library_POS.RData")
-  #ms2list_pos <- ms2list
-  #load("../tissues/data/RData/MS2_library_NEG.RData")
-  #ms2list_neg <- ms2list
-  
   dt_fg <- data.frame(
     FG = unique(features$FGx),
     mass = NA,
@@ -678,7 +673,7 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
             smbl <- "-"
             y.pol <- "negative"
             }
-          y.ms2 <- splitPolarities(ms2list, y.pol)
+          y.ms2 <- splitPolarities(MS2x, y.pol)
           y.ms2 <- findFragment(y.ms2, y.features$mzmed[i])
           y.ms2 <- getSpectrum(y.ms2, "rt", y.features$rtmed[i], rt.tol = 15)
           if(length(y.ms2) > 0){
