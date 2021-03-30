@@ -95,7 +95,7 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL){
       y.n <- y.n + 1 
       y.features <- features[is.na(features$FG), ] # subset the feature  matrix taking only
       # those still have not assigned to any "FG"
-      y.ft <- which(rownames(y.features) == rownames(features)[y])
+      y.ft <- which(rownames(y.features) == rownames(features)[ft_idx[y]])
       
       # RT range: get the co-eluting features
       y.features <- y.features[(y.features$rtmed > (y.features$rtmed[y.ft] - 10)) & 
@@ -104,7 +104,7 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL){
         
         # intensity correlation
         y.data <- data[rownames(data) %in% rownames(y.features), ]
-        y.cor <- cor(t(y.data), y.data[rownames(features)[y],])
+        y.cor <- cor(t(y.data), y.data[rownames(features)[ft_idx[y]],])
         y.features <- merge(y.features,y.cor, by = "row.names")
         colnames(y.features)[ncol(y.features)] <- "corr_int"
         rownames(y.features) <- y.features$Row.names
@@ -112,10 +112,10 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL){
         y.features <- y.features[y.features$corr_int > 0.7, ]
         
         # peak-shape correlation
-        y.xdata <- filterFile(xdata, which.max(data[rownames(features)[y],]))
+        y.xdata <- filterFile(xdata, which.max(data[rownames(features)[ft_idx[y]],]))
         y.chr <- chromatogram(y.xdata,
-                              mz = features$mzmed[y] + 0.01 * c(-1, 1),
-                              rt = features$rtmed[y] + 10 * c(-1,1),
+                              mz = features$mzmed[ft_idx[y]] + 0.01 * c(-1, 1),
+                              rt = features$rtmed[ft_idx[y]] + 10 * c(-1,1),
                               aggregationFun = "max")
         y.cor <- c()
         for(i in seq(nrow(y.features))){
