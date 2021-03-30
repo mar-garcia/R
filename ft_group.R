@@ -283,7 +283,7 @@ fg_grouping <- function(data, features){
   y.n <- 0
   for(y in seq(nrow(features))){
     if(is.na(features$FGx[y])){
-      y.features <- features[is.na(features$FGx), ]
+      y.features <- features[!is.na(features$FGx), ]
       y.features <- y.features[(y.features$FG == features$FG[y]) |
                                  y.features$polarity != features$polarity[y],]
       y.features <- y.features[(y.features$rtmed > (features$rtmed[y] - 10)) & 
@@ -581,7 +581,8 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
   features$assignation <- NA
   
   for(y in seq(nrow(dt_fg))){
-    y.features <- features[features$FGx == dt_fg$FG[y], ]
+    y.features <- features[!is.na(features$FGx), ]
+    y.features <- y.features[y.features$FGx == dt_fg$FG[y], ]
     
     dt_fg$RT[y] <- mean(y.features$rtmed)
     
