@@ -688,7 +688,7 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
           } else if(y.features$polarity[i] == "NEG"){
             smbl <- "-"
             y.pol <- "negative"
-            }
+          }
           y.ms2 <- splitPolarities(MS2x, y.pol)
           y.ms2 <- findFragment(y.ms2, y.features$mzmed[i])
           y.ms2 <- getSpectrum(y.ms2, "rt", y.features$rtmed[i], rt.tol = 15)
@@ -822,19 +822,6 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
   
   dt_fg <- dt_fg[order(dt_fg$RT), c("FG", "compound", "RT", "NEG", "POS")]
   dt_fg$RT <- sprintf("%.2f", round(dt_fg$RT/60, 2))
-  
-  
-  dt_fg$unknown <- grepl("Unknown", dt_fg$compound) | (dt_fg$compound == "")
-  dt_fg$duplicated <- dt_fg$compound %in% dt_fg$compound[duplicated(dt_fg$compound)]
-  dt_fg$background <- dt_fg$FG %in% unique(
-    features$FGx[features$mean_max2 < features$mean_max])
-  dt_fg$color <- 0
-  dt_fg$color[!dt_fg$unknown] <- 1
-  dt_fg$color[dt_fg$duplicated] <- 2
-  dt_fg$color[dt_fg$background] <- 3
-  dt_fg$color[!dt_fg$unknown & !dt_fg$duplicated] <- 1
-  dt_fg$compound[dt_fg$background & dt_fg$unknown] <- gsub(
-    "Unknown", "Background", dt_fg$compound[dt_fg$background & dt_fg$unknown])
   
   datax <- list(
     features = features,
