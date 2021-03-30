@@ -586,7 +586,7 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
   )
   
   dt_fg <- data.frame(
-    FG = unique(features$FGx),
+    FG = unique(features$FGx)[!is.na(unique(features$FGx))],
     mass = NA,
     RT = NA,
     POS = NA,
