@@ -282,8 +282,8 @@ fg_grouping <- function(data, features){
   features$annotation <- NA
   y.n <- 0
   for(y in seq(nrow(features))){
-    if(is.na(features$FGx[y])){
-      y.features <- features[!is.na(features$FGx), ]
+    if(!is.na(features$FG[y]) & is.na(features$FGx[y])){
+      y.features <- features[!is.na(features$FG), ]
       y.features <- y.features[(y.features$FG == features$FG[y]) |
                                  y.features$polarity != features$polarity[y],]
       y.features <- y.features[(y.features$rtmed > (features$rtmed[y] - 10)) & 
