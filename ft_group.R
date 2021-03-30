@@ -45,6 +45,7 @@ dt_preparation <- function(xobj, class, mznoise
     }
   }
   
+  features <- features[order(features$mean_max2, decreasing = T), ]
   rownames(features) <- gsub("FT", substring(x.pol, 1, 1), rownames(features))
   rownames(data) <- gsub("FT", substring(x.pol, 1, 1), rownames(data))
   colnames(data) <- gsub(paste0("_", x.pol, "_FS.mzData"), "", colnames(data))
@@ -85,7 +86,6 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL){
   
   features$FG <- NA
   features$MS2 <- NA
-  features <- features[order(features$mean_max2, decreasing = T), ]
   
   y.n <- 0
   
