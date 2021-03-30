@@ -570,6 +570,21 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
     massdif = getMolecule("C2H8N")$exactmass
   )
   
+  ann <- c(
+    "[M+H]+", "13C[M+H]+", "(2)13C[M+H]+", "[M]+",
+    "[M+NH4]+", "13C[M+NH4]+", "(2)13C[M+NH4]+", "[M]+ +NH3",
+    "[M+Na]+", "13C[M+Na]+", "[M+K]+", 
+    "[M+C2H8N]+", "13C[M+C2H8N]+",
+    "[2M+H]+", "13C[2M+H]+", "(2)13C[2M+H]+", "[3M+H]+", "13C[3M+H]+",
+    "[2M+Na]+", "13C[2M+Na]+",
+    
+    "[M-H]-", "13C[M-H]-", "(2)13C[M-H]-", "(3)13C[M-H]-",
+    "[M-H+HCOOH]-", "13C[M-H+HCOOH]-", 
+    "[2M-H]-", "13C[2M-H]-", "(2)13C[2M-H]-", "(3)13C[2M-H]-",
+    "[2M-2H+Na]-",
+    "[3M-H]-"
+  )
+  
   dt_fg <- data.frame(
     FG = unique(features$FGx),
     mass = NA,
