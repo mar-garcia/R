@@ -61,7 +61,7 @@ dt_preparation <- function(xobj, class, mznoise
 }
 
 
-ft_grouping <- function(datax, MS2x, ft_idx = NULL){
+ft_grouping <- function(datax, MS2x, ft_idx = NULL, rt_d = 10){
   
   require(CluMSID)
   require(CompoundDb)
@@ -98,8 +98,8 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL){
       y.ft <- which(rownames(y.features) == rownames(features)[ft_idx[y]])
       
       # RT range: get the co-eluting features
-      y.features <- y.features[(y.features$rtmed > (y.features$rtmed[y.ft] - 10)) & 
-                                 ( y.features$rtmed < (y.features$rtmed[y.ft] + 10)), ]
+      y.features <- y.features[(y.features$rtmed > (y.features$rtmed[y.ft] - rt_d)) & 
+                                 ( y.features$rtmed < (y.features$rtmed[y.ft] + rt_d)), ]
       if(nrow(y.features) > 1){
         
         # intensity correlation
