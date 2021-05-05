@@ -15,24 +15,50 @@ dt_preparation <- function(xobj, class, mznoise
   features <- data.frame(featureDefinitions(xobj))
   features$polarity <- x.pol
   
-  class.levels <- levels(factor(pData(xobj)[, class]))
-  for(i in seq(length(class.levels))){
-    tmp1 <- rowMeans(data[, pData(xobj)[, class] == class.levels[i]])
+  if(!is.na(class)){
+    class.levels <- levels(factor(pData(xobj)[, class]))
+    for(i in seq(length(class.levels))){
+      if(nrow(data) > 1){
+        tmp1 <- rowMeans(data[, pData(xobj)[, class] == class.levels[i]])
+      } else {
+        tmp1 <- mean(data)
+      }
+      features <- cbind(features, tmp1)
+      colnames(features)[ncol(features)] <- paste0("mean_", class.levels[i])
+      
+      if(length(class.levels) > 1){
+        tmp2 <- rowMeans(data[, pData(xobj)[, class] != class.levels[i]])
+        features <- cbind(features, tmp2)
+        colnames(features)[ncol(features)] <- paste0("mean_", class.levels[i], "_NO")
+        
+        tmp3 <- tmp1 / tmp2
+        tmp3[tmp3 == "Inf"] <- tmp1[tmp3 == "Inf"]
+        features <- cbind(features, tmp3)
+        colnames(features)[ncol(features)] <- paste0("prop_", class.levels[i]) 
+      } 
+    }
+  } else {
+    if(nrow(data) > 1){
+      tmp1 <- rowMeans(data)
+    } else {
+      tmp1 <- mean(data)
+    }
     features <- cbind(features, tmp1)
-    colnames(features)[ncol(features)] <- paste0("mean_", class.levels[i])
+    colnames(features)[ncol(features)] <- paste0("mean")
     
-    tmp2 <- rowMeans(data[, pData(xobj)[, class] != class.levels[i]])
-    features <- cbind(features, tmp2)
-    colnames(features)[ncol(features)] <- paste0("mean_", class.levels[i], "_NO")
-    
-    tmp3 <- tmp1 / tmp2
-    tmp3[tmp3 == "Inf"] <- tmp1[tmp3 == "Inf"]
-    features <- cbind(features, tmp3)
-    colnames(features)[ncol(features)] <- paste0("prop_", class.levels[i])
   }
   
-  features$mean_max <- apply(
-    features[,paste0("mean_", class.levels)], 1, max)
+  if(exists("class.levels")){
+    if(length(class.levels) > 1){
+      features$mean_max <- apply(
+        features[,paste0("mean_", class.levels)], 1, max)
+    } else {
+      features$mean_max <- features[,paste0("mean_", class.levels)]
+    }
+  } else{
+    features$mean_max <- features$mean
+  }
+  
   
   # Leave noisy peaks for last
   features$mean_max2 <- features$mean_max
@@ -61,14 +87,15 @@ dt_preparation <- function(xobj, class, mznoise
 }
 
 
-ft_grouping <- function(datax, MS2x, ft_idx = NULL, rt_d = 10){
+ft_grouping <- function(datax, MS2x, ft_idx = NULL, 
+                        rt_d = 10, icor = 0.7, pscor = 0.7){
   
   require(CluMSID)
   require(CompoundDb)
   require(Rdisop)
   
   neutral_losses <- data.frame(
-    formula = c("H2O", "C5H12NO5P", "C8H15NO4", "C9H17O10P", "C16H32O2", 
+    formula = c("H2O", "CH4O3", "C5H12NO5P", "C8H15NO4", "C9H17O10P", "C16H32O2", 
                 "C19H38O4"),
     massdiff = NA
   )
@@ -109,7 +136,8 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL, rt_d = 10){
         colnames(y.features)[ncol(y.features)] <- "corr_int"
         rownames(y.features) <- y.features$Row.names
         y.features <- y.features[,-1]
-        y.features <- y.features[y.features$corr_int > 0.7, ]
+        y.features <- y.features[y.features$corr_int > icor, ]
+        y.features <- y.features[order(y.features$mean_max2, decreasing = T),]
         
         # peak-shape correlation
         y.xdata <- filterFile(xdata, which.max(data[rownames(features)[ft_idx[y]],]))
@@ -131,6 +159,7 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL, rt_d = 10){
         colnames(y.features)[ncol(y.features)] <- "corr_ps"
         rownames(y.features) <- y.features$Row.names
         y.features <- y.features[,-1]
+        y.features <- y.features[order(y.features$mean_max2, decreasing = T),]
         
         # MS2 associations
         y.features <- y.features[y.features$corr_ps > 0.5, ]
@@ -148,8 +177,26 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL, rt_d = 10){
             if(length(y.ms2) == 1){
               tmp <- abs(y.ms2@precursor - y.features$mzmed[j]) < 0.01
             } else if(length(y.ms2) > 1){
-              tmp <- length(getSpectrum(y.ms2, "precursor", 
-                                        y.features$mzmed[j], mz.tol = 0.01)) > 0
+              tmp <- getSpectrum(y.ms2, "precursor", 
+                                 y.features$mzmed[j], mz.tol = 0.01)
+              # consider that it's a fragment only if the fragment has a 
+              # relative intensity > 0.5
+              if(length(tmp) == 1){
+                tmpk <- data.frame(tmp@spectrum)
+                tmpk$irel <- tmpk$X2 / max(tmpk$X2)
+                tmp <- tmpk$irel[unlist(matchWithPpm(y.features$mzmed[i], 
+                                                     tmpk$X1, ppm = 10))] > 0.5
+              } else if(length(tmp) > 1){
+                irel <- c()
+                for(k in seq(length(tmp))){
+                  tmpk <- data.frame(tmp[[k]]@spectrum)
+                  tmpk$irel <- tmpk$X2 / max(tmpk$X2)
+                  irel <- c(irel, 
+                            tmpk$irel[unlist(matchWithPpm(y.features$mzmed[i], 
+                                                          tmpk$X1, ppm = 10))])
+                }
+                tmp <- max(irel) > 0.5
+              } else {tmp <- FALSE}
             } else if(length(y.ms2) == 0){
               tmp <- FALSE
             }
@@ -193,7 +240,7 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL, rt_d = 10){
         }
         
         y.features <- y.features[
-          y.features$corr_ps > 0.7 |
+          y.features$corr_ps > pscor |
             (y.features$corr_ps > 0.5 & y.features$MS2x), ]  
       }
       features$FG[rownames(features) %in% rownames(y.features)] <- y.n
@@ -263,7 +310,7 @@ isotopologues <- function(features){
 
 
 
-fg_grouping <- function(data, features){
+fg_grouping <- function(data, features, icor = 0.7){
   
   require(Rdisop)
   
@@ -271,8 +318,10 @@ fg_grouping <- function(data, features){
                c(-1.007276 + getMolecule("HCOOH")$exactmass))
   names(massneg) <- c("[M-H]-", "[M+Cl]-", "[M-H+HCOOH]-")
   masspos <- c(1.007276, getMolecule("NH4")$exactmass, getMolecule("Na")$exactmass,
-               getMolecule("K")$exactmass, getMolecule("C2H8N")$exactmass)
-  names(masspos) <- c("[M+H]+", "[M+NH4]+", "[M+Na]+", "[M+K]+", "[M+C2H8N]+")
+               getMolecule("K")$exactmass, getMolecule("C2H8N")$exactmass,
+               -(getMolecule("C6H12O6")$exactmass - 1.007276))
+  names(masspos) <- c("[M+H]+", "[M+NH4]+", "[M+Na]+", "[M+K]+", "[M+C2H8N]+",
+                      "[M+H-hexose-H2O]+")
   massdif <- outer(masspos, massneg, "-")
   colnames(massdif) <- names(massneg)
   rownames(massdif) <- names(masspos) 
@@ -284,8 +333,10 @@ fg_grouping <- function(data, features){
   for(y in seq(nrow(features))){
     if(!is.na(features$FG[y]) & is.na(features$FGx[y])){
       y.features <- features[!is.na(features$FG), ]
-      y.features <- y.features[(y.features$FG == features$FG[y]) |
-                                 y.features$polarity != features$polarity[y],]
+      #y.features <- y.features[(y.features$FG == features$FG[y]) |
+      #                           y.features$polarity != features$polarity[y],]
+      y.features <- rbind(y.features[(y.features$FG == features$FG[y]), ], 
+                          y.features[(y.features$polarity != features$polarity[y]),])
       y.features <- y.features[(y.features$rtmed > (features$rtmed[y] - 10)) & 
                                  ( y.features$rtmed < (features$rtmed[y] + 10)), ]
       
@@ -342,7 +393,7 @@ fg_grouping <- function(data, features){
         y.n <- y.n + 1 
         if(cor(data[rownames(y.features)[which(y.features$polarity == "POS")[1]],],
                data[rownames(y.features)[which(y.features$polarity == "NEG")[1]],]
-        ) > 0.7){
+        ) > icor){
           tmp <- y.features[!grepl("13C|M", y.features$isotopes),]
           y.dif <- outer(tmp$mzmed[tmp$polarity == "POS"],  
                          tmp$mzmed[tmp$polarity == "NEG"], "-")
@@ -453,7 +504,7 @@ fg_grouping <- function(data, features){
         }
         y.features <- y.features[y.features$FG %in% y.features$FG[
           rownames(y.features) %in% names(cor(t(data[FT,]))[
-            ,rownames(y.features)[1]] > 0.7)], ]
+            ,rownames(y.features)[1]] > icor)], ]
         tmp <- y.features[!grepl("13C|M", y.features$isotopes),]
         y.dif <- outer(tmp$mzmed[tmp$polarity == "POS"],  
                        tmp$mzmed[tmp$polarity == "NEG"], "-")
@@ -557,7 +608,7 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
   require(CompoundDb)
   
   neutral_losses <- data.frame(
-    formula = c("H2O", "C5H12NO5P", "C8H15NO4", "C9H17O10P", "C16H32O2", 
+    formula = c("H2O", "CH4O3", "C5H12NO5P", "C8H15NO4", "C9H17O10P", "C16H32O2", 
                 "C19H38O4"),
     massdiff = NA
   )
@@ -775,8 +826,35 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
     y.features$assignation[idx] <- y.features$MS2[is.na(y.features$assignation) &
                                                     !is.na(y.features$MS2)]
     
-    idx <- is.na(y.features$assignation) & !is.na(y.features$isotopes)
-    y.features$assignation[idx] <- y.features$isotopes[idx]
+    idx <- which(is.na(y.features$assignation) & !is.na(y.features$isotopes))
+    if(length(idx) > 0){
+      y.features$assignation[idx] <- y.features$isotopes[idx]
+    }
+    
+    for(smbl in c("-", "+")){
+      idx <- which(y.features$assignation == paste0("[M", smbl, "H]", smbl))
+      if(length(idx) > 0){
+        if(!is.na(y.features$isotopes[idx])){
+          idx <- grepl(y.features$isotopes[idx], y.features$assignation)
+          y.features$assignation[idx] <- gsub(
+            gsub("\\[|]|-|+", "", y.features$isotopes[which(
+              y.features$assignation == paste0("[M", smbl, "H]", smbl))]), 
+            paste0("M", smbl, "H"), 
+            y.features$assignation[idx])
+        }
+        idx2 <- grep(round(y.features$mzmed[idx]), y.features$assignation)
+        if(length(idx2) > 0){
+          y.features$assignation[idx2] <- gsub(
+            round(y.features$mzmed[idx]), 
+            paste0("M", smbl, "H"), y.features$assignation[idx2])
+        }
+      } 
+    }
+    
+    idx <- which(grepl("13C", y.features$isotopes) & grepl("-X", y.features$assignation))
+    y.features$assignation[idx] <- paste0(gsub("C.*", "C", y.features$isotopes[idx]), y.features$assignation[y.features$isotopes == gsub(".*C", "", y.features$isotopes[idx])])
+    
+    
     
     y.features$assignation <- gsub("\\(1)13C", "13C", y.features$assignation)
     y.features$assignation <- gsub("M\\[M\\+H\\]\\+", "\\[M\\]\\+",
@@ -820,7 +898,7 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
     
   }
   
-  dt_fg <- dt_fg[order(dt_fg$RT), c("FG", "compound", "RT", "NEG", "POS")]
+  dt_fg <- dt_fg[order(dt_fg$RT), c("FG", "compound", "RT", "NEG", "POS", "mass")]
   dt_fg$RT <- sprintf("%.2f", round(dt_fg$RT/60, 2))
   
   datax <- list(
