@@ -90,7 +90,7 @@ dt_preparation <- function(xobj, class, mznoise
 ft_grouping <- function(datax, MS2x, ft_idx = NULL, 
                         rt_d = 10, icor = 0.7, pscor = 0.7){
   
-  require(CluMSID)
+  require(Spectra)
   require(CompoundDb)
   require(Rdisop)
   
@@ -171,29 +171,42 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL,
             smbl <- "-"
           }
           
-          y.ms2 <- findFragment(MS2x, y.features$mzmed[i])
-          y.ms2 <- getSpectrum(y.ms2, "rt", y.features$rtmed[i], rt.tol = 10)
+          #y.ms2 <- findFragment(MS2x, y.features$mzmed[i])
+          y.ms2 <- MS2x[containsMz(MS2x, y.features$mzmed[i], tolerance = 0.005)]
+          #y.ms2 <- getSpectrum(y.ms2, "rt", y.features$rtmed[i], rt.tol = 10)
+          y.ms2 <- filterRt(y.ms2, y.features$rtmed[i] + 10 * c(-1, 1))
           for(j in seq(nrow(y.features))){
             if(length(y.ms2) == 1){
-              tmp <- abs(y.ms2@precursor - y.features$mzmed[j]) < 0.01
+              tmp <- abs(y.ms2@backend@spectraData$precursorMz - y.features$mzmed[j]) < 0.01
             } else if(length(y.ms2) > 1){
-              tmp <- getSpectrum(y.ms2, "precursor", 
-                                 y.features$mzmed[j], mz.tol = 0.01)
+              #tmp <- getSpectrum(y.ms2, "precursor", y.features$mzmed[j], mz.tol = 0.01)
+              tmp <- filterPrecursorMz(y.ms2, y.features$mzmed[j] + 0.01 * c(-1, 1))
               # consider that it's a fragment only if the fragment has a 
               # relative intensity > 0.5
               if(length(tmp) == 1){
-                tmpk <- data.frame(tmp@spectrum)
-                tmpk$irel <- tmpk$X2 / max(tmpk$X2)
-                tmp <- tmpk$irel[unlist(matchWithPpm(y.features$mzmed[i], 
-                                                     tmpk$X1, ppm = 10))] > 0.5
+                #tmpk <- data.frame(tmp@spectrum)
+                tmpk <- data.frame(
+                  mz = unlist(mz(tmp)),
+                  int = unlist(intensity(tmp))
+                )
+                tmpk$irel <- tmpk$int / max(tmpk$int)
+                idx <- unlist(matchWithPpm(y.features$mzmed[i], tmpk$X1, ppm = 10))
+                if(length(idx) > 0){tmp <- tmpk$irel[idx] > 0.5} else {tmp <- FALSE}
               } else if(length(tmp) > 1){
                 irel <- c()
                 for(k in seq(length(tmp))){
-                  tmpk <- data.frame(tmp[[k]]@spectrum)
-                  tmpk$irel <- tmpk$X2 / max(tmpk$X2)
-                  irel <- c(irel, 
-                            tmpk$irel[unlist(matchWithPpm(y.features$mzmed[i], 
-                                                          tmpk$X1, ppm = 10))])
+                  #tmpk <- data.frame(tmp[[k]]@spectrum)
+                  tmpk <- data.frame(
+                    mz = mz(tmp)[[k]],
+                    int = intensity(tmp)[[k]]
+                  )
+                  tmpk$irel <- tmpk$int / max(tmpk$int)
+                  idx <- unlist(matchWithPpm(y.features$mzmed[i], tmpk$X1, ppm = 10))
+                  if(length(idx) > 0){
+                    irel <- c(irel, tmpk$irel[idx])
+                  } else{
+                    irel <- c(irel, 0)
+                  }
                 }
                 tmp <- max(irel) > 0.5
               } else {tmp <- FALSE}
@@ -207,18 +220,20 @@ ft_grouping <- function(datax, MS2x, ft_idx = NULL,
             }
             
           }
-        }
+        } # close row y.features "i"
         y.features$MS2x <- grepl("TRUE", y.features$MS2x)
         
         for(i in which(y.features$MS2x)){
-          y.ms2 <- findFragment(MS2x, y.features$mzmed[i])
-          y.ms2 <- getSpectrum(y.ms2, "rt", y.features$rtmed[i], rt.tol = 10)
+          #y.ms2 <- findFragment(MS2x, y.features$mzmed[i])
+          y.ms2 <- MS2x[containsMz(MS2x, y.features$mzmed[i], tolerance = 0.005)]
+          #y.ms2 <- getSpectrum(y.ms2, "rt", y.features$rtmed[i], rt.tol = 10)
+          y.ms2 <- filterRt(y.ms2, y.features$rtmed[i] + 10 * c(-1, 1))
           if(length(y.ms2) == 1){
-            y.prec <- y.ms2@precursor
+            y.prec <- y.ms2@backend@spectraData$precursorMz
           } else if(length(y.ms2) > 1){
             y.prec <- c()
             for(j in seq(length(y.ms2))){
-              y.prec <- c(y.prec, y.ms2[[j]]@precursor)
+              y.prec <- c(y.prec, y.ms2@backend@spectraData$precursorMz[j])
             }
             y.prec <- matchWithPpm(y.features$mzmed, y.prec, ppm = 10)
             y.prec <- lapply(y.prec, length)
@@ -604,7 +619,7 @@ ppm_dev <- function(e, t){((e-t)/t)*1e6}
 identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
   
   require(Rdisop)
-  require(CluMSID)
+  require(Spectra)
   require(CompoundDb)
   
   neutral_losses <- data.frame(
@@ -735,19 +750,24 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
         if(y.features$mzmed[i] < (mean(massneut) - 2)){
           if(y.features$polarity[i] == "POS"){
             smbl <- "+"
-            y.pol <- "positive"
+            #y.pol <- "positive"
+            y.p <- 1
           } else if(y.features$polarity[i] == "NEG"){
             smbl <- "-"
-            y.pol <- "negative"
+            #y.pol <- "negative"
+            y.p <- 0
           }
-          y.ms2 <- splitPolarities(MS2x, y.pol)
-          y.ms2 <- findFragment(y.ms2, y.features$mzmed[i])
-          y.ms2 <- getSpectrum(y.ms2, "rt", y.features$rtmed[i], rt.tol = 15)
+          #y.ms2 <- splitPolarities(MS2x, y.pol)
+          y.ms2 <- filterPolarity(MS2x, y.p)
+          #y.ms2 <- findFragment(y.ms2, y.features$mzmed[i])
+          y.ms2 <- y.ms2[containsMz(y.ms2, y.features$mzmed[i], tolerance = 0.005)]
+          #y.ms2 <- getSpectrum(y.ms2, "rt", y.features$rtmed[i], rt.tol = 15)
+          y.ms2 <- filterRt(y.ms2, y.features$rtmed[i] + 10 * c(-1, 1))
           if(length(y.ms2) > 0){
             if(length(y.ms2) > 1){
               y.prec <- c()
               for(j in seq(length(y.ms2))){
-                y.prec <- c(y.prec, y.ms2[[j]]@precursor)
+                y.prec <- c(y.prec, y.ms2@backend@spectraData$precursorMz[j])
               }
               if((max(y.prec) - min(y.prec)) > 1){
                 tmp <- data.frame(table(round(y.prec)))
@@ -771,7 +791,7 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
               } else {y.prec <- mean(y.prec)
               } # close "if((max(y.prec) - min(y.prec)) > 1)"
             } else if(length(y.ms2) == 1){
-              y.prec <- y.ms2@precursor
+              y.prec <- y.ms2@backend@spectraData$precursorMz
             }
             if(!is.na(y.prec)){
               y.nl <- mean(y.prec) - y.features$mzmed[i]
@@ -831,28 +851,30 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
       y.features$assignation[idx] <- y.features$isotopes[idx]
     }
     
-    for(smbl in c("-", "+")){
-      idx <- which(y.features$assignation == paste0("[M", smbl, "H]", smbl))
-      if(length(idx) > 0){
-        if(!is.na(y.features$isotopes[idx])){
-          idx <- grepl(y.features$isotopes[idx], y.features$assignation)
-          y.features$assignation[idx] <- gsub(
-            gsub("\\[|]|-|+", "", y.features$isotopes[which(
-              y.features$assignation == paste0("[M", smbl, "H]", smbl))]), 
-            paste0("M", smbl, "H"), 
-            y.features$assignation[idx])
-        }
-        idx2 <- grep(round(y.features$mzmed[idx]), y.features$assignation)
-        if(length(idx2) > 0){
-          y.features$assignation[idx2] <- gsub(
-            round(y.features$mzmed[idx]), 
-            paste0("M", smbl, "H"), y.features$assignation[idx2])
-        }
-      } 
-    }
+    #for(smbl in c("-", "+")){
+    #  idx <- which(y.features$assignation == paste0("[M", smbl, "H]", smbl))
+    #  if(length(idx) > 0){
+    #    if(!is.na(y.features$isotopes[idx])){
+    #      idx <- grepl(y.features$isotopes[idx], y.features$assignation)
+    #      y.features$assignation[idx] <- gsub(
+    #        gsub("\\[|]|-|+", "", y.features$isotopes[which(
+    #          y.features$assignation == paste0("[M", smbl, "H]", smbl))]), 
+    #        paste0("M", smbl, "H"), 
+    #        y.features$assignation[idx])
+    #    }
+    #    idx2 <- grep(round(y.features$mzmed[idx]), y.features$assignation)
+    #    if(length(idx2) > 0){
+    #      y.features$assignation[idx2] <- gsub(
+    #        round(y.features$mzmed[idx]), 
+    #        paste0("M", smbl, "H"), y.features$assignation[idx2])
+    #    }
+    #  } 
+    #}
     
-    idx <- which(grepl("13C", y.features$isotopes) & grepl("-X", y.features$assignation))
-    y.features$assignation[idx] <- paste0(gsub("C.*", "C", y.features$isotopes[idx]), y.features$assignation[y.features$isotopes == gsub(".*C", "", y.features$isotopes[idx])])
+    #idx <- which(grepl("13C", y.features$isotopes) & grepl("-X", y.features$assignation))
+    #y.features$assignation[idx] <- paste0(
+    #  gsub("C.*", "C", y.features$isotopes[idx]), 
+    #  y.features$assignation[y.features$isotopes == gsub(".*C", "", y.features$isotopes[idx])])
     
     
     
