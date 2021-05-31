@@ -295,31 +295,32 @@ isotopologues <- function(features){
       smbl <- "-"}
     z.features <- features[features$polarity == z.polarities[z], ]
     z.features <- z.features[!is.na(z.features$FG), ]
-    z.FG <- levels(factor(z.features$FG))
-    z.FG <- z.FG[!grepl("NA", z.FG)]
-    for(y in seq(length(z.FG))){
-      y.features <- z.features[z.features$FG == z.FG[y], ]
-      for(i in seq(nrow(y.features))){
-        if(is.na(y.features$isotopes[i])){
-          for(j in seq(4)){
+    if(nrow(z.features) > 0){
+      z.FG <- levels(factor(z.features$FG))
+      z.FG <- z.FG[!grepl("NA", z.FG)]
+      for(y in seq(length(z.FG))){
+        y.features <- z.features[z.features$FG == z.FG[y], ]
+        for(i in seq(nrow(y.features))){
+          if(is.na(y.features$isotopes[i])){
+            for(j in seq(4)){
+              y.features$isotopes[
+                unlist(matchWithPpm((y.features$mzmed[i] + 1.003355*j), 
+                                    y.features$mzmed, ppm = 10))
+              ] <- paste0("(", j, ")13C[", round(y.features$mzmed[i]), "]", smbl)
+            }
             y.features$isotopes[
-              unlist(matchWithPpm((y.features$mzmed[i] + 1.003355*j), 
+              unlist(matchWithPpm((y.features$mzmed[i] - 1.007276), 
                                   y.features$mzmed, ppm = 10))
-            ] <- paste0("(", j, ")13C[", round(y.features$mzmed[i]), "]", smbl)
+            ] <- paste0("M[", round(y.features$mzmed[i]), "]", smbl)
+            if(length(grep(round(y.features$mzmed[i]), y.features$isotopes)) > 0){
+              y.features$isotopes[i] <- paste0("[", round(y.features$mzmed)[i], "]", smbl)
+            } 
           }
-          y.features$isotopes[
-            unlist(matchWithPpm((y.features$mzmed[i] - 1.007276), 
-                                y.features$mzmed, ppm = 10))
-          ] <- paste0("M[", round(y.features$mzmed[i]), "]", smbl)
-          if(length(grep(round(y.features$mzmed[i]), y.features$isotopes)) > 0){
-            y.features$isotopes[i] <- paste0("[", round(y.features$mzmed)[i], "]", smbl)
-          } 
         }
+        features[rownames(y.features), "isotopes"] <- y.features[, "isotopes"]
       }
-      features[rownames(y.features), "isotopes"] <- y.features[, "isotopes"]
-    }
+    } 
   }
-  
   return(features)
 }
 
@@ -706,8 +707,10 @@ identification <- function(features, MS2x, cmps, rt_d = 60, ppm_d = 10){
                          massneut + annotations_add$massdif[which(
                            y.features$annotation[i] == annotations_add$ann)])
         } else {print(paste(y, i))}
-        if(abs(tmp) > 100){
-          y.features$annotation[i] <- NA
+        if(length(tmp) > 0){
+          if(abs(tmp) > 100){
+            y.features$annotation[i] <- NA
+          }
         }
       }
     } # close y.features "i"
