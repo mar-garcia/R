@@ -21,6 +21,7 @@ ann <- c("[M-H]-", "13C[M-H]-", "(2)13C[M-H]-", "2(13C)[M-H]-",
          "[2M(13C)-H]-", "13C[2M(13C)-H]-",
          "[2M-2H+Na]-", "[2M-2H+K]-", "13C[2M-2H+K]-", "[2M-4H+Fe3+]-",
          "[2M-H+HCOOH]-", "13C[2M-H+HCOOH]-", "2(13C)[2M-H+HCOOH]-",
+         "[2M-H+2(HCOOH)]-", "13C[2M-H+2(HCOOH)]-", "2(13C)[2M-H+2(HCOOH)]-",
          "[2M-H-CH2]-","13C[2M-H-CH2]-", "[2M-CH3]-", "13C[2M-CH3]-",
          
          "[M-H-glucuronide]+",
@@ -51,7 +52,7 @@ ann <- c("[M-H]-", "13C[M-H]-", "(2)13C[M-H]-", "2(13C)[M-H]-",
          "[decarboxy-hydroxy-elenolic -H]-","[DEDA-H]-","[DOA-H]-",
          "[dialdehydic elenolic ester decarboxymethyl - H]-",
          
-         "[18:2-H]-", "[24:0_d4-H]-",
+         "[18:2-H]-", "[22:0-H]-", "[24:0_d4-H]-",
          
          "[add]-", "[add-4]-", "13C[add-4]-", "[add-5]-", "13C[add-5]-", 
          "[add-6]-",
