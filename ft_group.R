@@ -1,3 +1,13 @@
+.ppm <- function(x, ppm = 10) {
+  ppm * x / 1e6
+}
+matchWithPpm <- function(x, y, ppm = 0) {
+  lapply(x, function(z, ppm) {
+    which(abs(z - y) <= (.ppm(z, ppm)) + 1e-9)
+  }, ppm = force(ppm))
+}
+
+
 dt_preparation <- function(xobj, class, mznoise
                            #polarity = c("POS", "NEG")
 ){
